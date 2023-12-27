@@ -2,70 +2,87 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use Auth;
-use Illuminate\Contracts\Auth\Guard;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Validator;
+use App\Models\User;
+use Illuminate\Http\Request;
+use App\Http\Requests\UserRequest;
+use Spatie\Permission\Models\Role;
+use App\Http\Requests\LoginRequest;
+use Illuminate\Contracts\Auth\Guard;
+use Illuminate\Support\Facades\Hash;
+use App\Http\Requests\ProfileRequest;
+use Spatie\Permission\Models\Permission;
 
+
+/**
+ * Class UserController
+ */
 class UserController extends Controller
 {
+    
     /**
-     * register
+     * Register 
      *
-     * @return json
+     * @param UserRequest $request
+     * @return Json
      */
-    public function register(Request $request)
+    public function register(UserRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|min:2|max:100',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
-        ]);
+        $request->validated();
+        
+    try {
+        if ($request->has('role') && $request->has('permission')) {
+            $roleName = $request->input('role');
+            $permissionName = $request->input('permission');
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 400);
+            $roleToAssign = Role::where('name', $roleName)->first();
+
+            if (!$roleToAssign) {
+                return response()->json(['error' => 'Role not found! Please contact admin'], 404);
+            }
+            $permissionToAssign = Permission::findOrCreate($permissionName);
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+            ]);
+
+            $user->assignRole($roleToAssign);
+            $user->givePermissionTo($permissionToAssign);
+
+            return response()->json([
+                'message' => 'User registered successfully',
+                'user' => $user,
+            ]);
         }
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
-        ]);
+    } catch (\Exception $exception) {
+        return response()->json(['error' => 'Permission not found! Please contact admin'], 404);
     }
+}
 
     /**
-     * login
+     * Logging 
      *
-     * @return token
+     * @param LoginRequest $request
+     * @param Guard $guard
+     * @return \Json
      */
-    public function login(Request $request, Guard $guard)
+    public function login(LoginRequest $request, Guard $guard)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required',
-            'password' => 'required|min:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 400);
-        }
-
+       $request->validated();
         if (!$token = $guard->attempt($validator->validated())) {
             return response()->json(['error' => 'Unauthorized']);
         }
 
         return $this->respondWithToken($token);
     }
+    
     /**
-     * respondwithtoken
+     * New access token.
      *
-     * @return mixed
+     * @param $token
+     * @return Json
      */
     protected function respondWithToken($token)
     {
@@ -75,17 +92,48 @@ class UserController extends Controller
             'expires_in' => auth()->factory()->getTTL() * 60,
         ]);
     }
+    
     /**
-     * profile
-     * @return json
+     * View profile and roles/permissions.
+     *
+     * @param ProfileRequest $request
+     * @return Json
      */
-    public function profile()
+    public function profile(ProfileRequest $request)
     {
-        return response()->json(auth()->user());
+        $request->validated();
+
+    try {
+        if ($request->has('role') && $request->has('permission')) {
+            $roleName = $request->input('role');
+            $permissionName = $request->input('permission');
+
+            $roleToAssign = Role::where('name', $roleName)->first();
+
+            if (!$roleToAssign) {
+                return response()->json(['error' => 'Role not found! Please contact admin'], 404);
+            }
+
+            $permissionToAssign = Permission::findByName($permissionName);
+
+            $user = auth()->user();
+            $user->assignRole($roleToAssign);
+            $user->givePermissionTo($permissionToAssign);
+
+            return response()->json([
+                'message' => 'You are permission for view',
+                'user' => $user,
+            ]);
+        }
+    } catch (\Exception $exception) {
+        return response()->json(['error' => 'Permission not found! Please contact admin'], 404);
     }
+}
+
     /**
-     * refrsh
-     * @return
+     * Refresh Token.
+     *
+     * @return Json
      */
     public function refresh()
     {
@@ -97,12 +145,11 @@ class UserController extends Controller
                 'type' => 'bearer',
             ],
         ]);
-
     }
     /**
-     * logout
+     * Log out 
      *
-     * @return  json
+     * @return json 
      */
     public function logout()
     {

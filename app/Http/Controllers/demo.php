@@ -1,61 +1,33 @@
-<?php
 
-namespace App\Http\Requests;
-
-use Illuminate\Foundation\Http\FormRequest;
-
-class UserRequest extends FormRequest
-{
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
-    public function authorize()
+public function profile(ProfileRequest $request)
     {
-        return true;
-    }
+        $request->validated();
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, mixed>
-     */
-    public function rules()
-    {
-        return [
-            'name' => 'required|string|min:2|max:100',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:6', 
-            ];
-    }
-    
-    /**
-     * Get the validation messages that apply to the request.
-     *
-     * @return array<string, mixed>
-     */
-    public function messages()
-    {
-        return [
-            'name.required' => 'please enter first name',
-            'email.required' => 'please enter email',
-            'password.required' => 'please enter password',
-        ];
-    }
+    try {
+        if ($request->has('role') && $request->has('permission')) {
+            $roleName = $request->input('role');
+            $permissionName = $request->input('permission');
 
-    /**
-     * Get the validation attribute that apply to the request.
-     *
-     * @return array<string, mixed>
-     */
-    public function attributes()
-    {
-        return [
-            'name' => 'first name',
-            'lastname'=>'last name',
-            'password' => 'password',
-        ];
+            $roleToAssign = Role::where('name', $roleName)->first();
+
+            if (!$roleToAssign) {
+                return response()->json(['error' => 'Role not found! Please contact admin'], 404);
+            }
+
+            $permissionToAssign = Permission::findByName($permissionName);
+
+            $user = auth()->user();
+            $user->assignRole($roleToAssign);
+            $user->givePermissionTo($permissionToAssign);
+
+            return response()->json([
+                'message' => 'You are permission for view',
+                'user' => $user,
+            ]);
+        }
+    } catch (\Exception $exception) {
+        return response()->json(['error' => 'Permission not found! Please contact admin'], 404);
     }
 }
-
+Error: Call to a member function assignRole() on null in file C:\xampp\htdocs\jwt\app\Http\Controllers\UserController.php on line 125
+solve error this code 

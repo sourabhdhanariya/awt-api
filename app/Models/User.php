@@ -12,6 +12,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements JWTSubject
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
+    
          /**
      * Get the identifier that will be stored in the subject claim of the JWT.
      *
@@ -29,7 +30,8 @@ class User extends Authenticatable implements JWTSubject
      */
     public function getJWTCustomClaims()
     {
-        return [];
+    
+    return [];
     }
 
     /**
